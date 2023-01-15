@@ -10,6 +10,7 @@ using UnityEngine.UI;
 public class FFRDEBUGSCRIPT : UdonSharpBehaviour
 {
 public Text TextOutput;
+public Text EventTextOutput;
 [TextArea]public String debugOutput;
 [System.NonSerializedAttribute][HideInInspector] public VRCPlayerApi localPlayer;
 public Vector3 pos = new Vector3(0,0,0);
@@ -32,6 +33,7 @@ void Start()
         localPlayer = Networking.LocalPlayer;
         Debug.Log("Debug Script init");
         // startPos = TextOutput.rectTransform.position;
+        EventTextOutput.text = "EventList";
     }
     void Update()
     {
@@ -117,26 +119,29 @@ void Start()
                     string toAdd = "";
                     toAdd = toAdd + "\n[MAPOffset]:: " +
                             "\nx:" + UIScript.Map.position.x + " " +
-                            "\ny:" + UIScript.Map.position.y + "  " +
-                            "\nz:" + UIScript.Map.position.z + "\n";
-                    if (UIScript.stationObject != null)
-                    {
-                        toAdd = toAdd + "\n[ZHKStation]:: "
-                                      + "[CurrentPlayerMapPosition]" +
-                                      "\nStationID:" + UIScript.stationObject.name +
-                                      "\nx:" + UIScript.stationObject.CurrentPlayerPosition.x + " " +
-                                      "\ny:" + UIScript.stationObject.CurrentPlayerPosition.y + "  " +
-                                      "\nz:" + UIScript.stationObject.CurrentPlayerPosition.z + " " +
-                                      "\nInVehicle?:" + UIScript.stationObject.inVehicle +
-                                      "\nisMe??:" + UIScript.stationObject.isMe + "\n";
-
+                            "\ty:" + UIScript.Map.position.y + "  " +
+                            "\tz:" + UIScript.Map.position.z + "\n";
+                if (UIScript.stationObject != null)
+                {
+                    toAdd = toAdd + "\n[ZHKStation]:: "
+                                  + "[CurrentPlayerMapPosition]" +
+                                  "\nStationID:" + UIScript.stationObject.name +
+                                  "\nx:" + UIScript.stationObject.CurrentPlayerPosition.x + " " +
+                                  "\ty:" + UIScript.stationObject.CurrentPlayerPosition.y + "  " +
+                                  "\tz:" + UIScript.stationObject.CurrentPlayerPosition.z + " " +
+                                  "\nInVehicle?:" + UIScript.stationObject.inVehicle +
+                                  "\nisMe??:" + UIScript.stationObject.isMe + "\n";
+                } //check stations data even dont have station now
                         toAdd = toAdd + "\n[Checking]::"+checking+""
                                 +"\n[SelectedStation]" +
                                 "\nStationID:" + Stations[checking].name +
-                                "\nUIScriptStation:" + (UIScript.stationObject == Stations[checking] ? "Yes" : "No") +
+                                ((UIScript.stationObject != null) ? 
+                                ("\nUIScriptStation:" + (UIScript.stationObject == Stations[checking] ? "Yes" : "No"))
+                                :("No UIScriptStation"))+
                                 "\nx:" + Stations[checking].CurrentPlayerPosition.x + " " +
-                                "\ny:" + Stations[checking].CurrentPlayerPosition.y + "  " +
-                                "\nz:" + Stations[checking].CurrentPlayerPosition.z  + "\n" +
+                                "\ty:" + Stations[checking].CurrentPlayerPosition.y + "  " +
+                                "\tz:" + Stations[checking].CurrentPlayerPosition.z  + "\n" +
+                                "PlayerControllLocal: " + UIScript.PlayerManager.stationFlagLocal[checking] +
                                   "\nGameObjectActive" + Stations[checking].gameObject.activeSelf  +
                                   "\nInVehicle?:" + Stations[checking].inVehicle +
                                   "\nz:" + "isMe??:" + Stations[checking].isMe +
@@ -144,19 +149,25 @@ void Start()
                                   "\n DoIOwn?: " + Networking.IsOwner(Networking.LocalPlayer, Stations[checking].gameObject) + 
                                   (Stations[checking].Player != null
                             ? "\nPlayer:" + Stations[checking].Player.displayName + "\n"
-                            : "\nPlayer: None") + "";
-                    }
+                            : "\nPlayer: None") + ""
+                            + "\nSeated: " + Stations[checking].playerSet;
+                        //toAdd = toAdd + "\n[PlayerWorldOffset]:: " +
+                        //    "\nx:" + Stations[checking].oldoffset.x + " " +
+                        //    "\ty:" + Stations[checking].oldoffset.y + "  " +
+                        //    "\tz:" + Stations[checking].oldoffset.z + "\n"
+                        ;
+                
                     if (UIScript.OWML != null)
                     {
                         toAdd = toAdd + "\n [OWML] + " +
                                 "\n PosSync:: \nx:" 
                                 + UIScript.OWML.PosSync.x + 
-                                " \ny:" + UIScript.OWML.PosSync.y + "  " +
-                                "\nz:" + UIScript.OWML.PosSync.z +
+                                " \ty:" + UIScript.OWML.PosSync.y + "  " +
+                                "\tz:" + UIScript.OWML.PosSync.z +
                                 "\n AnchorCoordinates:: " +
                                 "\nx:[" + UIScript.OWML.AnchorCoordsPosition.x + "] " +
-                                "\ny:[" +UIScript.OWML.AnchorCoordsPosition.y + "]  " +
-                                "\nz:[" + UIScript.OWML.AnchorCoordsPosition.z + "]"+
+                                "\ty:[" +UIScript.OWML.AnchorCoordsPosition.y + "]  " +
+                                "\tz:[" + UIScript.OWML.AnchorCoordsPosition.z + "]"+
                                 "\n Moved:" + UIScript.OWML.moved+
                                 "\n Distance To AC:\n" +
                                 Vector3.Distance(UIScript.OWML.AnchorCoordsPosition,
@@ -168,6 +179,15 @@ void Start()
 
                 debugOutput = text;
                 TextOutput.text = text;
+        }
+    }
+    public void Log(string logInfo)
+    { 
+        if(EventTextOutput!=null)
+        {
+            EventTextOutput.text = EventTextOutput.text + "\n";
+            EventTextOutput.text = EventTextOutput.text + "[" + System.DateTime.Now.ToString()+ "]\t";
+            EventTextOutput.text = EventTextOutput.text + logInfo;
         }
     }
 }

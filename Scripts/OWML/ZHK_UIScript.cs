@@ -120,7 +120,9 @@ public class ZHK_UIScript : UdonSharpBehaviour
     public float initTimer = 0f;
     
     public bool doPlayerSkybox = false;
+    
     public GameObject Debugger;
+    FFRDEBUGSCRIPT OWMLDebuger;
 
     private bool holdCTRL;
     private bool holdAlt;
@@ -172,6 +174,9 @@ public class ZHK_UIScript : UdonSharpBehaviour
         // }
         timer = (recheckInterval) / .9f;
         SetOWMLValue();
+
+        //debug
+        OWMLDebuger = Debugger.GetComponent<FFRDEBUGSCRIPT>();
     }
 
     public void SetOWMLValue()
@@ -294,8 +299,11 @@ public class ZHK_UIScript : UdonSharpBehaviour
                 ((Networking.IsOwner(PlayerManager.gameObject) && initialized)))
             {
                 Debug.Log("Player has no Station yet after " + recheckInterval + "s. Re-sending request.");
+                FFRDebug("Player has no Station yet after " + recheckInterval + "s. Re-sending request.");
                 timer = 0f;
-                PlayerManager.recheckPlayerIDs();
+                //隔离同步与非同步对象
+                //VRC.Udon.Common.Interfaces.NetworkEventTarget.Owner 此处使用ownere的话 是哪个脚本的owner (ui or palyer)
+                PlayerManager.SendCustomNetworkEvent(VRC.Udon.Common.Interfaces.NetworkEventTarget.All, "recheckPlayersIDmode");
             }
             else
             {
@@ -353,6 +361,18 @@ public class ZHK_UIScript : UdonSharpBehaviour
             {
                 Skybox.SetFloat("_AtmosphereThickness",  baseAtmos - (( offsetHeight - AtmosphereDarkStart) / AtmosphereDarkMax));
             }
+        }
+    }
+
+    private void FFRDebug(string x)
+    {
+        if (OWMLDebuger)
+        {
+            OWMLDebuger.Log(x);
+        }
+        else
+        {
+            Debug.Log("Debugger Not Set!");
         }
     }
 }

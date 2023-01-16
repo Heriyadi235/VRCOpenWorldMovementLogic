@@ -122,7 +122,7 @@ public class ZHK_UIScript : UdonSharpBehaviour
     public bool doPlayerSkybox = false;
     
     public GameObject Debugger;
-    FFRDEBUGSCRIPT OWMLDebuger;
+    public FFRDEBUGSCRIPT OWMLDebuger;
 
     private bool holdCTRL;
     private bool holdAlt;
@@ -303,7 +303,7 @@ public class ZHK_UIScript : UdonSharpBehaviour
                 timer = 0f;
                 //隔离同步与非同步对象
                 //VRC.Udon.Common.Interfaces.NetworkEventTarget.Owner 此处使用ownere的话 是哪个脚本的owner (ui or palyer)
-                PlayerManager.SendCustomNetworkEvent(VRC.Udon.Common.Interfaces.NetworkEventTarget.All, "recheckPlayersIDmode");
+                PlayerManager.SendCustomNetworkEvent(VRC.Udon.Common.Interfaces.NetworkEventTarget.All, nameof(PlayerManager.recheckPlayers));
             }
             else
             {

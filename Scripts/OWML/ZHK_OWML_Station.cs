@@ -14,6 +14,8 @@ using VRC.Udon.Common.Interfaces;
 
 // TODO: Further Optimization & smoother player movement
 [UdonBehaviourSyncMode(BehaviourSyncMode.Manual)]
+//[UdonBehaviourSyncMode(BehaviourSyncMode.Continuous)]
+
 public class ZHK_OWML_Station : UdonSharpBehaviour
 {
     
@@ -32,7 +34,7 @@ public class ZHK_OWML_Station : UdonSharpBehaviour
 
     //PlayerInfo
     [VRC.Udon.Serialization.OdinSerializer.OdinSerialize] /* UdonSharp auto-upgrade: serialization */     public VRCPlayerApi Player;
-    [System.NonSerializedAttribute] [UdonSynced, FieldChangeCallback(nameof(inVehicle))] public bool _inVehicle = false;
+    [System.NonSerializedAttribute] [UdonSynced(UdonSyncMode.None), FieldChangeCallback(nameof(inVehicle))] public bool _inVehicle = false;
     public bool inVehicle
     {
         set
@@ -52,7 +54,8 @@ public class ZHK_OWML_Station : UdonSharpBehaviour
         }
         get => _inVehicle;
     }
-    [System.NonSerializedAttribute] [UdonSynced, FieldChangeCallback((nameof(PlayerID)))] public int _PlayerID = -1;
+    //[System.NonSerializedAttribute] [UdonSynced(UdonSyncMode.None), FieldChangeCallback((nameof(PlayerID)))] public int _PlayerID = -1;
+    [System.NonSerializedAttribute] [FieldChangeCallback((nameof(PlayerID)))] public int _PlayerID = -1; //改为不同步，根据player controller 赋值
     public int PlayerID
     {
         set
@@ -67,12 +70,12 @@ public class ZHK_OWML_Station : UdonSharpBehaviour
         get => _PlayerID;
     }
     [HideInInspector] public bool isMe = false;
-    [HideInInspector] [UdonSynced] public bool playerSet = false; //玩家已经坐在椅子上了
-    
+    [HideInInspector] [UdonSynced(UdonSyncMode.None)] public bool playerSet = false; //玩家已经坐在椅子上了
 
 
-    [System.NonSerializedAttribute] [UdonSynced] public Vector3 CurrentPlayerPosition = Vector3.zero;
-    [System.NonSerializedAttribute] [UdonSynced] public Quaternion CurrentPlayerRotation;
+
+    [System.NonSerializedAttribute] [UdonSynced(UdonSyncMode.None)] public Vector3 CurrentPlayerPosition = Vector3.zero;
+    [System.NonSerializedAttribute] [UdonSynced(UdonSyncMode.None)] public Quaternion CurrentPlayerRotation;
     public Vector3 oldPos = Vector3.zero;
     private Quaternion oldRot;
     private float timerPlayerUpdate = 0f;
@@ -83,7 +86,6 @@ public class ZHK_OWML_Station : UdonSharpBehaviour
     private bool nextFrame = false;
     private float timeoutTimer = 0f;
 
-    FFRDEBUGSCRIPT OWMLDebuger;
 
     //[System.NonSerializedAttribute] [UdonSynced] public Vector3 oldoffset = Vector3.zero; //存储了这个站的坐标
     //[System.NonSerializedAttribute] [UdonSynced] public bool mapoffsetUpdateFlag = false;
@@ -91,18 +93,16 @@ public class ZHK_OWML_Station : UdonSharpBehaviour
 
     //[VRC.Udon.Serialization.OdinSerializer.OdinSerialize] /* UdonSharp auto-upgrade: serialization */
     //public VRCPlayerApi LocalPlayer;
-    
+
     void Start()
     {
         UIScript = OWML_Player.UIScript;
         //oldoffset = UIScript.Map.transform.position;
         transform.position = Vector3.zero;
         stationObject.PlayerMobility = VRCStation.Mobility.Mobile;
+        stationObject.canUseStationFromStation = true;
         stationObject.disableStationExit = true;
         //LocalPlayer = Networking.LocalPlayer;
-
-        //debug
-        OWMLDebuger = UIScript.Debugger.GetComponent<FFRDEBUGSCRIPT>();
     }
 
     public void OnEnable()
@@ -129,14 +129,16 @@ public class ZHK_OWML_Station : UdonSharpBehaviour
         FFRDebug("STATION REGISTER" + gameObject.name);
         if (PlayerID == Networking.LocalPlayer.playerId) //被分配到的玩家执行这里
         {
+            FFRDebug("STATION REGISTER OWNER" + PlayerID + "TO" + gameObject.name);
             Player = Networking.LocalPlayer;
             UIScript.stationObject = this;
             isMe = true;
             Networking.SetOwner(Networking.LocalPlayer, gameObject);
-            SendCustomEventDelayedSeconds(nameof(useSeat),1);
+            SendCustomEventDelayedSeconds(nameof(useSeat),1);//延迟1s以等待ownerset生效
         }
         else
         {
+            FFRDebug("STATION REGISTER NONOWNER "+ PlayerID +"TO"+  gameObject.name);
             Player = VRCPlayerApi.GetPlayerById(PlayerID);
             isMe = false;
             stationObject.PlayerMobility = VRCStation.Mobility.Immobilize;
@@ -155,7 +157,6 @@ public class ZHK_OWML_Station : UdonSharpBehaviour
         if (PlayerID != -1)
         {
             FFRDebug("Clearing Station for register");
-            stationObject.ExitStation(VRCPlayerApi.GetPlayerById(PlayerID));
         }
         else
         {
@@ -182,53 +183,66 @@ public class ZHK_OWML_Station : UdonSharpBehaviour
 
     public void useSeat()
     {
-        if (Player == Networking.LocalPlayer)
+        if (Player.isLocal)
         {
             TemporaryVelocity = Networking.LocalPlayer.GetVelocity();
             stationObject.PlayerMobility = VRCStation.Mobility.Mobile;
             stationObject.UseStation(Networking.LocalPlayer);
         }
     }
-    
-    //public override void OnOwnershipTransferred(VRCPlayerApi player)
-    //{
+
+    public override void OnPlayerLeft(VRCPlayerApi player)
+    {
+        //这里与Playercontroller的功能有重复
+        if (player.playerId == PlayerID)
+        {
+            //PlayerID = -1; //Station 不应该自己更改PlayerID，这是一个例外
+            playerSet = false;
+        }
+    }
+    public override void OnOwnershipTransferred(VRCPlayerApi player)
+    {
+        
     //    Debug.Log("!!!!!!!! ON OWNERSHIP TRANSFERRED CALL");
-    //    FFRDebug("!!!!!!!! ON OWNERSHIP TRANSFERRED CALL");
-    //    if (PlayerID != -1)//after assigned the playerid has been synced to every player
-    //        Player = VRCPlayerApi.GetPlayerById(PlayerID);
-    //    else
-    //        gameObject.SetActive(false);
+        //可能来到这的情况
+        //1.被分配了座椅
+        //2.玩家离开了
+        //FFRDebug("Station OwnerChanged!");
+        //if (PlayerID != -1)//after assigned the playerid has been synced to every player
+        //    Player = VRCPlayerApi.GetPlayerById(PlayerID);
+        //    else
+        //        gameObject.SetActive(false);
 
-    //    //Player = Networking.GetOwner(gameObject)
-    //    if (playerNeedAssign && PlayerID != -1)
-    //    {
-    //        if (Networking.IsOwner(gameObject))
-    //        {
-    //            Debug.Log("registe player from OnOwnershipTransferred");
-    //            FFRDebug("registe player from OnOwnershipTransferred");
-    //            gameObject.SetActive(true);
-    //            Player = VRCPlayerApi.GetPlayerById(PlayerID);
-    //            UIScript.stationObject = this;
-    //            isMe = true;
+        //    //Player = Networking.GetOwner(gameObject)
+        //    if (playerNeedAssign && PlayerID != -1)
+        //    {
+        //        if (Networking.IsOwner(gameObject))
+        //        {
+        //            Debug.Log("registe player from OnOwnershipTransferred");
+        //            FFRDebug("registe player from OnOwnershipTransferred");
+        //            gameObject.SetActive(true);
+        //            Player = VRCPlayerApi.GetPlayerById(PlayerID);
+        //            UIScript.stationObject = this;
+        //            isMe = true;
 
-    //            PlayerID = Networking.LocalPlayer.playerId; //see if id will change after
-    //            SendCustomEventDelayedSeconds(nameof(useSeat), 2);
-    //        }
-    //        else//不是房主，仅仅是被通知到了座椅分配
-    //        {
-    //            Debug.Log("OnOwnershipcall but not owner");
-    //            FFRDebug("OnOwnershipcall but not owner");
-    //            gameObject.SetActive(true);
-    //            Player = VRCPlayerApi.GetPlayerById(PlayerID);
-    //            isMe = false;
-    //        }
-    //        playerNeedAssign = false;
-    //    }
-    //    else //座椅的玩家离开或者房主更换了
-    //    {
-    //        unregister();
-    //    }
-    //}
+        //            PlayerID = Networking.LocalPlayer.playerId; //see if id will change after
+        //            SendCustomEventDelayedSeconds(nameof(useSeat), 2);
+        //        }
+        //        else//不是房主，仅仅是被通知到了座椅分配
+        //        {
+        //            Debug.Log("OnOwnershipcall but not owner");
+        //            FFRDebug("OnOwnershipcall but not owner");
+        //            gameObject.SetActive(true);
+        //            Player = VRCPlayerApi.GetPlayerById(PlayerID);
+        //            isMe = false;
+        //        }
+        //        playerNeedAssign = false;
+        //    }
+        //    else //座椅的玩家离开或者房主更换了
+        //    {
+        //        unregister();
+        //    }
+    }
 
     //public override void OnDeserialization()
     //{
@@ -289,9 +303,15 @@ public class ZHK_OWML_Station : UdonSharpBehaviour
         //Entered a vehicle or something else.
         Debug.Log(player.displayName + "-" + player.playerId + " Left Station" + gameObject.name);
         FFRDebug(player.displayName + "-" + player.playerId + " Left Station" + gameObject.name);
-        stationObject.PlayerMobility = VRCStation.Mobility.Mobile;
+        //stationObject.PlayerMobility = VRCStation.Mobility.Mobile;
         //Do something over here if in case player has been using another seat.
-        playerSet = false; 
+        playerSet = false;
+
+        if (isMe && !inVehicle)
+        {
+            nextFrame = false; //TODO:ressign attemped time
+            //useSeat();
+        }
     }
 
     //public void OwnershipRecheck()
@@ -324,16 +344,16 @@ public class ZHK_OWML_Station : UdonSharpBehaviour
 
     //}
 
-    public void broadcastRefreshSeat()
-    {
-        SendCustomEventDelayedSeconds(nameof(refreshSeat), 4);
-    }
+    //public void broadcastRefreshSeat()
+    //{
+    //    SendCustomEventDelayedSeconds(nameof(refreshSeat), 4);
+    //}
     
-    public void refreshSeat()
-    {
-        gameObject.SetActive(true);
-        timeoutTimer = 0;
-    }
+    //public void refreshSeat()
+    //{
+    //    gameObject.SetActive(true);
+    //    timeoutTimer = 0;
+    //}
 
     //public void checkIfPlayerPresent() // function call to 'synchronize' the player that's not in a station locally
     //{
@@ -388,17 +408,23 @@ public class ZHK_OWML_Station : UdonSharpBehaviour
                 IndicatorDebug.SetActive(false);
             }
 
-            if (isMe && playerSet)
+            if (Player == null && VRCPlayerApi.GetPlayerById(PlayerID) != null)
+            {
+                    register();
+            }
+
+            if (isMe) //这里不检查playersset, 因为player owml 会导致玩家一瞬间离开椅子
             {
                 if (Player != Networking.LocalPlayer)//某种异常, 玩家退出的一瞬间发生
                 {
                     Debug.Log("line388 really happend, sad,,,");
                 }
-                if (!nextFrame && !inVehicle)
+                //if (!nextFrame && !inVehicle)
+                if (!playerSet && !inVehicle)
                 {
-                    FFRDebug("On Chunk station Update");
+                    FFRDebug("Seems haven't seat, Resign station");
                     nextFrame = true;
-                    useSeat(); //下面的事件好像没有被接受到，所以这里处理了一下
+                    //useSeat(); //下面的事件好像没有被接受到，所以这里处理了一下(暂时的)
                     SendCustomNetworkEvent(NetworkEventTarget.All, nameof(useSeat));
                 }
                 if (UIScript.PlayerAircraft != null && !inVehicle)
@@ -448,10 +474,13 @@ public class ZHK_OWML_Station : UdonSharpBehaviour
                 {
                     if (!inVehicle || UIScript.syncEvenInVehicle)
                     {
-                        // stationObject.transform.position = Vector3.MoveTowards(oldPos, UIScript.Map.position + CurrentPlayerPosition, 6);
-                        stationObject.transform.position = Vector3.Lerp(oldPos, UIScript.Map.position + CurrentPlayerPosition, Time.deltaTime * 10);
-                        // stationObject.transform.localPosition = Vector3.Lerp(oldPos,CurrentPlayerPosition, Time.deltaTime); //<-- stationObject local position syncing *Call it a day*
-                        stationObject.transform.rotation = Quaternion.Slerp(oldRot, CurrentPlayerRotation, Time.deltaTime * 10);
+                        //// stationObject.transform.position = Vector3.MoveTowards(oldPos, UIScript.Map.position + CurrentPlayerPosition, 6);
+                        //stationObject.transform.position = Vector3.Lerp(oldPos, UIScript.Map.position + CurrentPlayerPosition, Time.deltaTime * 10);
+                        //// stationObject.transform.localPosition = Vector3.Lerp(oldPos,CurrentPlayerPosition, Time.deltaTime); //<-- stationObject local position syncing *Call it a day*
+                        //stationObject.transform.rotation = Quaternion.Slerp(oldRot, CurrentPlayerRotation, Time.deltaTime * 10);
+                        stationObject.transform.SetPositionAndRotation(
+                            Vector3.Lerp(oldPos, UIScript.Map.position + CurrentPlayerPosition, Time.deltaTime * 10), 
+                            Quaternion.Slerp(oldRot, CurrentPlayerRotation, Time.deltaTime * 10)); 
                         oldPos = stationObject.transform.position;
                         oldRot = stationObject.transform.rotation;
                     }
@@ -462,14 +491,7 @@ public class ZHK_OWML_Station : UdonSharpBehaviour
 
     private void FFRDebug(string x)
     {
-        if (OWMLDebuger)
-        {
-            OWMLDebuger.Log(x);
-        }
-        else
-        {
-            Debug.Log("Debugger Not Set!");
-        }
+            UIScript.OWMLDebuger.Log(x);
     }
 }
 

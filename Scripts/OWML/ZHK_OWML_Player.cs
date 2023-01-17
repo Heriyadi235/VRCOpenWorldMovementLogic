@@ -14,6 +14,7 @@ Discord: ZhakamiZhako#2147
 Twitter: @ZZhako
 Email: zhintamizhakami@gmail.com
 */
+[DefaultExecutionOrder(10)]
 [UdonBehaviourSyncMode(BehaviourSyncMode.Manual)]
 public class ZHK_OWML_Player : UdonSharpBehaviour
 {
@@ -35,10 +36,11 @@ public class ZHK_OWML_Player : UdonSharpBehaviour
     private void Start()
     {
         //初始化座位标志
-        for (int i = 0; i < stationFlagLocal.Length; i++)
+        for (int i = 0; i < Stations.Length; i++)
         {
             stationFlag[i] = -1;
             stationFlagLocal[i] = -1;
+            Stations[i].stationIndex = i;
         }
 
         if (Networking.IsMaster && Networking.IsOwner(gameObject))
@@ -346,18 +348,11 @@ public class ZHK_OWML_Player : UdonSharpBehaviour
                 {
                     FFRDebug("Player " + players[x].playerId + " dont have station, registering");
                     register(players[x]);
-                    return;
                 }
             }
             //如果所有的玩家在房主视角中都有station了,不会在前面return，说明有的玩家没收到座椅分配信息，重新序列化
-            RequestSerialization();
         }
-
-        // if (noMiss)
-        // {
-        //Debug.Log("Ownership recheck...");
-        //    ownershipRechecks();
-        // }
+        RequestSerialization();
     }
 
     //public void ownershipRechecks()

@@ -23,7 +23,7 @@ Treat this as the local player controller & settings.
 Add **ALL** SyncScripts in the SAV_SyncScript[].
 */
 [DefaultExecutionOrder(-11)]
-[UdonBehaviourSyncMode(BehaviourSyncMode.Manual)]
+[UdonBehaviourSyncMode(BehaviourSyncMode.NoVariableSync)]
 public class ZHK_UIScript : UdonSharpBehaviour
 {
     [HideInInspector] public UdonBehaviour PlayerAircraft;
@@ -295,8 +295,9 @@ public class ZHK_UIScript : UdonSharpBehaviour
         
         if (stationObject == null)
         {
-            if (timer > recheckInterval && (!Networking.IsOwner(PlayerManager.gameObject)) ||
-                ((Networking.IsOwner(PlayerManager.gameObject) && initialized)))
+            if (timer > recheckInterval && ((!Networking.IsOwner(PlayerManager.gameObject)) ||
+                ((Networking.IsOwner(PlayerManager.gameObject) && initialized))))
+            //owml has a bug here, if player is master and  stationObject == null, recheckInterval will failed.
             {
                 Debug.Log("Player has no Station yet after " + recheckInterval + "s. Re-sending request.");
                 FFRDebug("Player has no Station yet after " + recheckInterval + "s. Re-sending request.");

@@ -34,7 +34,7 @@ public class ZHK_OWML_Station : UdonSharpBehaviour
 
 
     //PlayerInfo
-    /*[VRC.Udon.Serialization.OdinSerializer.OdinSerialize]*/ /* UdonSharp auto-upgrade: serialization */     public VRCPlayerApi Player;
+    [System.NonSerializedAttribute] public VRCPlayerApi Player;
     [System.NonSerializedAttribute] [UdonSynced(UdonSyncMode.None), FieldChangeCallback(nameof(inVehicle))] public bool _inVehicle = false;
     public bool inVehicle
     {
@@ -48,7 +48,8 @@ public class ZHK_OWML_Station : UdonSharpBehaviour
                 stationObject.transform.position = Networking.LocalPlayer.GetPosition();
                 stationObject.PlayerMobility = VRCStation.Mobility.Mobile;
                 FFRDebug("UseStation form inVehicle false");
-                stationObject.UseStation(Networking.LocalPlayer);
+                //stationObject.UseStation(Networking.LocalPlayer);
+                SendCustomEventDelayedFrames(nameof(useSeat), 10);//use seat 1 second later avoid being kick out
             }
         }
         get => _inVehicle;
@@ -69,14 +70,13 @@ public class ZHK_OWML_Station : UdonSharpBehaviour
         get => _PlayerID;
     }
     [HideInInspector] public bool isMe = false;
-    [HideInInspector] [UdonSynced(UdonSyncMode.None)] public bool playerSet = false; //玩家已经坐在椅子上了(不可靠)
-
-
+    [HideInInspector] [UdonSynced(UdonSyncMode.None)] public bool playerSet = false; //玩家已经坐在椅子上了(差不多可靠了，但是还没应用上)
 
     [System.NonSerializedAttribute] [UdonSynced(UdonSyncMode.None)] public Vector3 CurrentPlayerPosition = Vector3.zero;
     [System.NonSerializedAttribute] [UdonSynced(UdonSyncMode.None)] public Quaternion CurrentPlayerRotation;
     public Vector3 oldPos = Vector3.zero;
     private Quaternion oldRot;
+    
     private float timerPlayerUpdate = 0f;
     private float distanceFromCenter = 0f;
     private Vector3 PlayerPosition = Vector3.zero;
@@ -93,7 +93,6 @@ public class ZHK_OWML_Station : UdonSharpBehaviour
 
     //[VRC.Udon.Serialization.OdinSerializer.OdinSerialize] /* UdonSharp auto-upgrade: serialization */
     //public VRCPlayerApi LocalPlayer;
-
     void Start()
     {
         UIScript = OWML_Player.UIScript;
@@ -116,7 +115,6 @@ public class ZHK_OWML_Station : UdonSharpBehaviour
         FFRDebug(gameObject.name + "station disable");
         //unregister();
     }
-
 
     public void register()
     {
@@ -149,7 +147,6 @@ public class ZHK_OWML_Station : UdonSharpBehaviour
         PlayerID = -1;
         playerSet = false;
     }
-
 
     public override void OnPlayerRespawn(VRCPlayerApi player)
     {
@@ -260,7 +257,6 @@ public class ZHK_OWML_Station : UdonSharpBehaviour
         //Do something over here if in case player has been using another seat.
         playerSet = false;
     }
-
 
     void Update()
     {

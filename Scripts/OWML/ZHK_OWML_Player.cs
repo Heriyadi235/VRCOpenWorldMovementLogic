@@ -24,8 +24,8 @@ public class ZHK_OWML_Player : UdonSharpBehaviour
     //[System.NonSerializedAttribute] [UdonSynced] public string stationFlag ;
     //[System.NonSerializedAttribute] public string stationFlagLocal ;
 
-    [System.NonSerializedAttribute] [UdonSynced] public int[] stationFlag = new int[80];
-    //TODO:之后压缩一下这个变量，反正范围不大，减少网络开销
+    [System.NonSerializedAttribute] [UdonSynced] public sbyte[] stationFlag = new sbyte[80];
+
     [System.NonSerializedAttribute] public int[] stationFlagLocal = new int[80];
 
     [Tooltip("Required: 80 Player Stations. (ZHK_OWML_Station)")]
@@ -57,7 +57,9 @@ public class ZHK_OWML_Player : UdonSharpBehaviour
         // VRCPlayerApi.GetPlayers(players);
 
         FFRDebug("Player" + player.playerId + "Joined");
-        if (player.playerId < Networking.LocalPlayer.playerId) //之后加入的玩家也会收到之前加入的玩家的加入事件，处理一下
+        if (player.playerId < Networking.LocalPlayer.playerId) 
+        //之后加入的玩家也会收到之前加入的玩家的加入事件，但此时加入房间的首次序列化已经完成了
+        //他们的注册，处理一下
         {
             FFRDebug("Former joiner, no need to assign");
             return;
@@ -103,7 +105,7 @@ public class ZHK_OWML_Player : UdonSharpBehaviour
                     FFRDebug("Owner PlayerController register player " + xx.playerId + " to station" + target);
                     for (int i = 0; i < Stations.Length; i++)//C#里能不能直接等于赋值？
                     {
-                        stationFlag[i] = stationFlagLocal[i];
+                        stationFlag[i] = (sbyte)stationFlagLocal[i];
                     }
                     RequestSerialization();
                     ApplyStationFlag();
@@ -148,7 +150,8 @@ public class ZHK_OWML_Player : UdonSharpBehaviour
             if (Networking.IsOwner(gameObject))
             {
                 FFRDebug("Owner PlayerController unregister player " + xx.playerId + " from station" + target);
-                stationFlag = stationFlagLocal;
+                for(int i = 0; i<Stations.Length; i++)
+                    stationFlag[i] = (sbyte)stationFlagLocal[i];
                 ApplyStationFlag();
                 SendCustomEventDelayedSeconds(nameof(RequestSerialization), 1); //玩家退出后，等待其他玩家承认房主移交可能需要一些时间,所以这里延迟序列化一下
                 //RequestSerialization();
@@ -160,20 +163,7 @@ public class ZHK_OWML_Player : UdonSharpBehaviour
             
         }
     }
-
-    public override void OnPreSerialization()
-    {
-        var strflaglocal = "";
-        var strreceive = "";
-        for (int i = 0; i < 10; i++)
-        {
-            strflaglocal += stationFlagLocal[i];
-            strreceive += stationFlag[i];
-        }
-        FFRDebug("local is " + strflaglocal);
-        FFRDebug("receiver is " + strreceive);
-        FFRDebug("PreSerialization");
-    }
+    
     public override void OnOwnershipTransferred(VRCPlayerApi player)
     {
         //如果先收到OnPlayerLeft,再收到OnOwnershipTransferred
@@ -191,6 +181,20 @@ public class ZHK_OWML_Player : UdonSharpBehaviour
         //}
     }
 
+    public override void OnPreSerialization()
+    {
+        var strflaglocal = "";
+        var strreceive = "";
+        for (int i = 0; i < 10; i++)
+        {
+            strflaglocal += stationFlagLocal[i];
+            strreceive += stationFlag[i];
+        }
+        FFRDebug("local is " + strflaglocal);
+        FFRDebug("receiver is " + strreceive);
+        FFRDebug("PreSerialization");
+    }
+    
     public override void OnDeserialization()
     {
         FFRDebug("OnDeserialization");
@@ -253,7 +257,6 @@ public class ZHK_OWML_Player : UdonSharpBehaviour
                     Stations[i].PlayerID = stationFlagLocal[i]; 
                     Stations[i].gameObject.SetActive(true);
                     FFRDebug("apply station register from "+stationFlagLocal[i] + "to " + Stations[i].PlayerID); 
-                    //如果房主与一位玩家同时加入，那么此处的PlayerId甚至还是-1 其他时候正常？离谱,这个bug会在本地测试时候触发
                     Stations[i].register(); 
                     FFRDebug("apply station register DONE" + Stations[i].PlayerID);
                 }
@@ -268,50 +271,12 @@ public class ZHK_OWML_Player : UdonSharpBehaviour
                 }
                 
             }
-            //else if(stationFlagLocal[i] == Stations[i].PlayerID 
-            //        && stationFlagLocal[i] != -1
-            //        && stationFlagLocal[i] != Networking.LocalPlayer.playerId)//player has assigned
-            //{
-            //    FFRDebug("Repeat Apply");
-            //}
         }
-    }
-    
-    //public void checkPlayer()
-    //{
-    //    FFRDebug("[PlayerController]checkPlayer");
-    //    foreach (var x in Stations)
-    //    {
-    //        x.checkIfPlayerPresent();
-    //    }
-    //}
-
-    public void recheckPlayerIDs()
-    {
-        FFRDebug("[PlayerController]recheckPlayerIDs");
-        Debug.Log("recheck Players request");
-        //SendCustomNetworkEvent(NetworkEventTarget.All, nameof(recheckPlayers));
-         
-        if (Networking.IsOwner(gameObject))
-        {
-            recheckPlayers();
-        }
-    }
-    
-    public bool debugPrintPlayers()
-    {
-        FFRDebug("[PlayerController]debugPrintPlayers");
-        foreach (var x in players)
-        {
-            if (x != null) Debug.Log("P:id:" + x.playerId);
-        }
-
-        return true;
-
-    }
+    } 
 
     public int IsPlayerInStationFlag(int id)
     {
+        //check if a player id has in playerstationlocal
         int target = -1;
         for (int i = 0; i < Stations.Length; i++)//find if player already in
         {
@@ -326,14 +291,12 @@ public class ZHK_OWML_Player : UdonSharpBehaviour
     
     public void recheckPlayers()
     {
+        //fired when someone don't have station after 15s
         if (!Networking.IsOwner(gameObject))  {return; }
-        if (UIScript == null) return; //TODO,房主没有station的情况如何处理,暂时这么写先
+        if (UIScript.stationObject == null) return; //TODO,房主没有station的情况如何处理
         FFRDebug("[PlayerController]Someone still has no station after 15 seconds. Rechecking Players");
         Debug.Log("Someone still has no station after 15 seconds. Rechecking Players");
         players = VRCPlayerApi.GetPlayers(players);
-        
-        Debug.Log("TestPlayers");
-        Debug.Log(players.ToString());
 
         for (int x = 0; x < players.Length; x++)
         {
@@ -355,43 +318,14 @@ public class ZHK_OWML_Player : UdonSharpBehaviour
         RequestSerialization();
     }
 
-    //public void ownershipRechecks()
-    //{
-    //    FFRDebug("[PlayerController]ownershipRechecks");
-    //    foreach (var x in Stations)
-    //    {
-    //        if (x.gameObject.activeInHierarchy)
-    //        {
-    //            x.broadcastOwnershipRecheck();
-    //        }
-    //    }
-    //}
-
     public void resyncCall()
     {
-        //Debug.Log("Resynchronize Call!");
+        //fired every 15 seconds
         RequestSerialization();
     }
-
-    //public void doDelay()
-    //{
-    //    SendCustomNetworkEvent(NetworkEventTarget.All, nameof(checkPlayer));
-    //}
 
     private void FFRDebug(string x)
     { 
             UIScript.OWMLDebuger.Log(x);
     }
-
-    //private float timeoutTimer = 0f;
-    //public void Update()
-    //{
-    //    timeoutTimer = timeoutTimer + Time.deltaTime;
-
-    //    if (timeoutTimer > 10)
-    //    {
-    //        FFRDebug("player controller still alive");
-    //        timeoutTimer = 0;
-    //    }
-    //}
 }

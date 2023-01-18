@@ -38,6 +38,7 @@ public class ZHK_OWML_Station : UdonSharpBehaviour
     [System.NonSerializedAttribute] [UdonSynced(UdonSyncMode.None), FieldChangeCallback(nameof(inVehicle))] public bool _inVehicle = false;
     public bool inVehicle
     {
+        //note 玩家退出是可能导致PlayerID = -1
         set
         {
             _inVehicle = value;
@@ -45,10 +46,9 @@ public class ZHK_OWML_Station : UdonSharpBehaviour
             FFRDebug(PlayerID + "In vehicle Called " + value);
             if (Networking.IsOwner(gameObject) && UIScript.stationObject == this && !value)
             {
-                stationObject.transform.position = Networking.LocalPlayer.GetPosition();
+                //stationObject.transform.position = Networking.LocalPlayer.GetPosition();
                 stationObject.PlayerMobility = VRCStation.Mobility.Mobile;
                 FFRDebug("UseStation form inVehicle false");
-                //stationObject.UseStation(Networking.LocalPlayer);
                 SendCustomEventDelayedFrames(nameof(useSeat), 10);//use seat 1 second later avoid being kick out
             }
         }
@@ -101,7 +101,7 @@ public class ZHK_OWML_Station : UdonSharpBehaviour
         stationObject.PlayerMobility = VRCStation.Mobility.Immobilize;
         stationObject.canUseStationFromStation = true;
         stationObject.disableStationExit = true;
-        FFRDebug("Station" + stationIndex + "ready");
+        FFRDebug("Station " + stationIndex + " ready");
     }
 
     public void OnEnable()
@@ -162,11 +162,14 @@ public class ZHK_OWML_Station : UdonSharpBehaviour
 
     public void useSeat()
     {
-        FFRDebug("On useSeat" + Networking.GetOwner(gameObject).displayName + "[" + Networking.GetOwner(gameObject).playerId + "]");
+        FFRDebug("On useSeat " + Networking.GetOwner(gameObject).displayName + "[" + Networking.GetOwner(gameObject).playerId + "]");
         if (Player != null)
         {
             if (Player.isLocal)
             {
+                stationObject.transform.SetPositionAndRotation(
+                    Networking.LocalPlayer.GetPosition(),
+                    Networking.LocalPlayer.GetRotation());
                 TemporaryVelocity = Networking.LocalPlayer.GetVelocity();
                 stationObject.PlayerMobility = VRCStation.Mobility.Mobile;
                 stationObject.UseStation(Networking.LocalPlayer);
@@ -176,15 +179,15 @@ public class ZHK_OWML_Station : UdonSharpBehaviour
             FFRDebug("Player is none, useSeat call failed"); //useful fixs script halted on second joiner 
     }
 
-    public override void OnPlayerLeft(VRCPlayerApi player)
-    {
-        //这里与Playercontroller的功能有重复
-        if (player.playerId == PlayerID)
-        {
-            //PlayerID = -1; //Station 不应该自己更改PlayerID，这是一个例外
-            playerSet = false;
-        }
-    }
+    //public override void OnPlayerLeft(VRCPlayerApi player)
+    //{
+    //    //这里与Playercontroller的功能有重复
+    //    if (player.playerId == PlayerID)
+    //    {
+    //        //PlayerID = -1; //Station 不应该自己更改PlayerID，这是一个例外
+    //        playerSet = false;
+    //    }
+    //}
     
     public override void OnOwnershipTransferred(VRCPlayerApi player)
     {
@@ -232,8 +235,8 @@ public class ZHK_OWML_Station : UdonSharpBehaviour
 
     public override void OnStationEntered(VRCPlayerApi player) // station enter logic
     {
-        Debug.Log(player.displayName + "-" + player.playerId + " Entered Station" + gameObject.name);
-        FFRDebug(player.displayName + "-" + player.playerId + " Entered Station" + gameObject.name);
+        Debug.Log(player.displayName + "[" + player.playerId + "] Entered Station" + gameObject.name);
+        FFRDebug(player.displayName + "[" + player.playerId + "] Entered Station" + gameObject.name);
         playerSet = true;
         if (!player.isLocal)
         {
@@ -249,10 +252,9 @@ public class ZHK_OWML_Station : UdonSharpBehaviour
 
     public override void OnStationExited(VRCPlayerApi player)
     {
-        //从驾驶位下来也会触发OnStationExited，导致nextFrame不可靠
         //Entered a vehicle or something else.
-        Debug.Log(player.displayName + "-" + player.playerId + " Left Station" + gameObject.name);
-        FFRDebug(player.displayName + "-" + player.playerId + " Left Station" + gameObject.name);
+        Debug.Log(player.displayName + "[" + player.playerId + "] Left Station" + gameObject.name);
+        FFRDebug(player.displayName + "[" + player.playerId + "] Left Station" + gameObject.name);
         //stationObject.PlayerMobility = VRCStation.Mobility.Mobile;
         //Do something over here if in case player has been using another seat.
         playerSet = false;
@@ -277,13 +279,13 @@ public class ZHK_OWML_Station : UdonSharpBehaviour
 
         if (PlayerID != -1)
         {
-            //if (UIScript.stationObject == this && PlayerID == -1) //不这么更新，以PlayerID为是否有玩家的准则
+            //if (UIScript.stationObject == this && PlayerID == -1) //不这么更新，以PlayerID为是否有玩家为准则
             if (UIScript.stationObject == this && Networking.IsOwner(gameObject))
             {
                 IndicatorDebug.SetActive(false);
             }
 
-            if (Player == null)//信息残缺的话更新方式
+            if (Player == null)//信息残缺的更新方式
             {
                 if (PlayerID == Networking.LocalPlayer.playerId) //被分配到的玩家执行这里
                 {
@@ -297,6 +299,11 @@ public class ZHK_OWML_Station : UdonSharpBehaviour
                 else
                 {
                     FFRDebug("fixing broken station on others" + PlayerID + " to " + gameObject.name);
+                    if (VRCPlayerApi.GetPlayerById(PlayerID) == null)
+                    {
+                        FFRDebug("Player not exists " + PlayerID );
+                        unregister();
+                    }
                     Player = VRCPlayerApi.GetPlayerById(PlayerID);
                     isMe = false;
                     stationObject.PlayerMobility = VRCStation.Mobility.Immobilize;
@@ -304,7 +311,7 @@ public class ZHK_OWML_Station : UdonSharpBehaviour
                 FFRDebug("fixing done");
             }
 
-            if (isMe && Networking.IsOwner(gameObject)) //这里不检查playersset, 因为player owml 会导致玩家一瞬间离开椅子
+            if (isMe && Networking.IsOwner(gameObject))
             {
                 if (Player != Networking.LocalPlayer)//某种异常, 玩家退出的一瞬间发生
                 {
@@ -313,11 +320,23 @@ public class ZHK_OWML_Station : UdonSharpBehaviour
                 if (!nextFrame && !inVehicle)
                 //if (!playerSet && !inVehicle)
                 {
-                    //FFRDebug("Seems haven't seat, Resign station");
                     FFRDebug("On nextFrame true, Resign station");
                     nextFrame = true;
-                    //useSeat(); //下面的事件好像没有被接受到，所以这里处理了一下(暂时的)
                     SendCustomNetworkEvent(NetworkEventTarget.All, nameof(useSeat));
+                }
+                if (!inVehicle && !playerSet)
+                {
+                    timeoutTimer = timeoutTimer + Time.deltaTime;
+                    if (timeoutTimer > UIScript.recheckInterval)
+                    {
+                        FFRDebug("Player not in station after 15s, using");
+                        //stationObject.transform.position = Networking.LocalPlayer.GetPosition();
+                        //stationObject.transform.SetPositionAndRotation(
+                        //    Networking.LocalPlayer.GetPosition(),
+                        //    Networking.LocalPlayer.GetRotation());
+                        useSeat();
+                        timeoutTimer = 0;
+                    }
                 }
                 if (UIScript.PlayerAircraft != null && !inVehicle)
                 {
@@ -333,6 +352,7 @@ public class ZHK_OWML_Station : UdonSharpBehaviour
 
                 if ((!inVehicle || UIScript.syncEvenInVehicle))
                 {
+                    //owner player normal update
                     PlayerPosition = Networking.LocalPlayer.GetPosition();
                     if (/*!Networking.IsClogged && */timerPlayerUpdate > UIScript.PlayerUpdateRate)
                     {
@@ -346,6 +366,7 @@ public class ZHK_OWML_Station : UdonSharpBehaviour
                 }
 
                 if (!inVehicle && UIScript.allowPlayerOWML) // Player Teleport MUST NOT BE CALLED WHILE FLYING! 
+                //player owml
                 {
                     if (Vector3.Distance(PlayerPosition, Vector3.zero) > UIScript.ChunkDistance)
                     {
@@ -368,7 +389,7 @@ public class ZHK_OWML_Station : UdonSharpBehaviour
                     {
                         stationObject.transform.SetPositionAndRotation(
                             Vector3.Lerp(oldPos, UIScript.Map.position + CurrentPlayerPosition, Time.deltaTime * 10), 
-                            Quaternion.Slerp(oldRot, CurrentPlayerRotation, Time.deltaTime * 10)); 
+                            Quaternion.Slerp(oldRot, CurrentPlayerRotation, Time.deltaTime * 10));
                         oldPos = stationObject.transform.position;
                         oldRot = stationObject.transform.rotation;
                     }

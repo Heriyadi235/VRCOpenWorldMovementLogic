@@ -283,7 +283,7 @@ public class ZHK_OWML_Player : UdonSharpBehaviour
             if (stationFlagLocal[i] == id)
             {
                 target = i;
-                FFRDebug("Player " + id + " Already have station " + i);
+                FFRDebug("IsPlayerInStationFlag found Player " + id + " at station " + i);
             }
         }
         return target;
@@ -296,11 +296,12 @@ public class ZHK_OWML_Player : UdonSharpBehaviour
         if (UIScript.stationObject == null) return; //TODO,房主没有station的情况如何处理
         FFRDebug("[PlayerController]Someone still has no station after 15 seconds. Rechecking Players");
         Debug.Log("Someone still has no station after 15 seconds. Rechecking Players");
-        players = VRCPlayerApi.GetPlayers(players);
-
+        VRCPlayerApi.GetPlayers(players);
+        
+        //检查已有的玩家
         for (int x = 0; x < players.Length; x++)
         {
-            if(players[x].IsValid())
+            if(players[x] != null)
             {
                 var target = IsPlayerInStationFlag(players[x].playerId);
                 if (target != -1)
@@ -315,6 +316,23 @@ public class ZHK_OWML_Player : UdonSharpBehaviour
             }
             //如果所有的玩家在房主视角中都有station了,不会在前面return，说明有的玩家没收到座椅分配信息，重新序列化
         }
+
+        //检查已经退出的玩家
+        for (int i = 0; i < Stations.Length; i++)
+        {
+            if (Stations[i].PlayerID == -1)
+            {
+                continue;
+            }
+            if (VRCPlayerApi.GetPlayerById(Stations[i].PlayerID) == null)
+            {
+                //手动注销一下
+                FFRDebug("Playid[" + Stations[i].PlayerID + "] has left, unregisting");
+                Stations[i].unregister();
+                stationFlagLocal[i] = -1;
+                stationFlag[i] = -1;
+            }
+        }
         RequestSerialization();
     }
 
@@ -328,4 +346,5 @@ public class ZHK_OWML_Player : UdonSharpBehaviour
     { 
             UIScript.OWMLDebuger.Log(x);
     }
+
 }

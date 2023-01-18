@@ -130,11 +130,11 @@ void Start()
                                   "\ty:" + UIScript.stationObject.CurrentPlayerPosition.y + "  " +
                                   "\tz:" + UIScript.stationObject.CurrentPlayerPosition.z + " " +
                                   "\nInVehicle?:" + UIScript.stationObject.inVehicle +
-                                  "\nisMe??:" + UIScript.stationObject.isMe + "\n";
+                                  "\nisMe??:" + UIScript.stationObject.isMe + " "+"\n";
                 } //check stations data even dont have station now
                         toAdd = toAdd + "\n[Checking]::"+checking+""
                                 +"\n[SelectedStation]" +
-                                "\nStationID:" + Stations[checking].name +
+                                "\nStationID:" + Stations[checking].stationIndex + Stations[checking].name +
                                 ((UIScript.stationObject != null) ? 
                                 ("\nUIScriptStation:" + (UIScript.stationObject == Stations[checking] ? "Yes" : "No"))
                                 :("No UIScriptStation"))+
@@ -150,7 +150,8 @@ void Start()
                                   (Stations[checking].Player != null
                             ? "\nPlayer:" + Stations[checking].Player.displayName + "\n"
                             : "\nPlayer: None") + ""
-                            + "\nSeated: " + Stations[checking].playerSet;
+                            + "\nSeated: " + Stations[checking].playerSet
+                            +"\nMobile: " + Stations[checking].stationObject.PlayerMobility;
                         //toAdd = toAdd + "\n[PlayerWorldOffset]:: " +
                         //    "\nx:" + Stations[checking].oldoffset.x + " " +
                         //    "\ty:" + Stations[checking].oldoffset.y + "  " +
@@ -181,13 +182,21 @@ void Start()
                 TextOutput.text = text;
         }
     }
+    public int logcount = 0;
     public void Log(string logInfo)
     { 
         if(EventTextOutput!=null)
         {
+            if (logcount > 40)
+            {
+                logcount = 0;
+                EventTextOutput.text = "";
+            }
             EventTextOutput.text = EventTextOutput.text + "\n";
             EventTextOutput.text = EventTextOutput.text + "[" + System.DateTime.Now.ToString()+ "]\t";
             EventTextOutput.text = EventTextOutput.text + logInfo;
+            logcount += 1;
         }
+        
     }
 }

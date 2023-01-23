@@ -262,6 +262,7 @@ public class ZHK_OWML_Station : UdonSharpBehaviour
 
     void Update()
     {
+#if !UNITY_EDITOR
         if (PlayerID == -1 && UIScript.stationObject != this /*|| !playerSet*/)
         {
             //尝试一下从外部获取playerid
@@ -324,6 +325,7 @@ public class ZHK_OWML_Station : UdonSharpBehaviour
                     nextFrame = true;
                     SendCustomNetworkEvent(NetworkEventTarget.All, nameof(useSeat));
                 }
+
                 if (!inVehicle && !playerSet)
                 {
                     timeoutTimer = timeoutTimer + Time.deltaTime;
@@ -338,6 +340,7 @@ public class ZHK_OWML_Station : UdonSharpBehaviour
                         timeoutTimer = 0;
                     }
                 }
+
                 if (UIScript.PlayerAircraft != null && !inVehicle)
                 {
                     inVehicle = true;
@@ -396,11 +399,12 @@ public class ZHK_OWML_Station : UdonSharpBehaviour
                 }
             }
         }
+#endif
     }
 
     private void FFRDebug(string x)
     {
-            UIScript.OWMLDebuger.Log(x);
+            //UIScript.OWMLDebuger.Log(x);
     }
 }
 

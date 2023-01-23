@@ -344,7 +344,7 @@ public class ZHK_OWML_Player : UdonSharpBehaviour
 
     private void FFRDebug(string x)
     { 
-            UIScript.OWMLDebuger.Log(x);
+            //UIScript.OWMLDebuger.Log(x);
     }
 
 }
